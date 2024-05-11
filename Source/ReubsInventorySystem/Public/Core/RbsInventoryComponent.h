@@ -90,6 +90,11 @@ public:
 	
 	int32 ConsumeItem(URbsInventoryItem* Item);
 	int32 ConsumeItem(URbsInventoryItem* Item, const int32 Quantity);
+
+protected:
+
+	UFUNCTION()
+	void OnItemModified_Internal();
 	
 /*
  * Helpers

@@ -8,16 +8,6 @@
 class URbsInventoryItem;
 
 UENUM(BlueprintType)
-enum class EItemRarity : uint8
-{
-	IR_Common UMETA(DisplayName = "Common"),
-	IR_Uncommon UMETA(DisplayName = "Uncommon"),
-	IR_Rare UMETA(DisplayName = "Rare"),
-	IR_VeryRare UMETA(DisplayName = "Very Rare"),
-	IR_Legendary UMETA(DisplayName = "Legendary")
-};
-
-UENUM(BlueprintType)
 enum class EItemAddResult : uint8
 {
 	IAR_NoItemsAdded UMETA(DisplayName = "No items added"),

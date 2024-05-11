@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
-#include "Utils/RbsTypes.h"
 #include "RbsInventoryItem.generated.h"
 
 class URbsItemTooltip;
@@ -33,6 +32,8 @@ public:
 /*
  * Properties
  */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
+	TSubclassOf<AActor> PickupClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	UTexture2D* Thumbnail{};
@@ -42,12 +43,6 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Item", meta = (MultiLine = true))
 	FText Description;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Item")
-	FText UseActionText;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Item")
-	EItemRarity Rarity = EItemRarity::IR_Uncommon;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Item", meta = (ClampMin = 0.0))
 	float Weight = 1.f;

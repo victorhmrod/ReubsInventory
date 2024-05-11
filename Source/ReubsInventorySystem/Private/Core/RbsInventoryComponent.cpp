@@ -59,8 +59,10 @@ URbsInventoryItem* URbsInventoryComponent::AddItem(URbsInventoryItem* Item)
 	NewItem->OwningInventory = this;
 	NewItem->AddedToInventory(this);
 	Items.Add(NewItem);
-	NewItem->MarkDirtyForReplication();
 	OnReplicated_Items();
+	NewItem->MarkDirtyForReplication();
+
+	NewItem->OnItemModified.AddDynamic(this, &ThisClass::OnItemModified_Internal);
 
 	return NewItem;
 }
@@ -112,6 +114,7 @@ FItemAddResult URbsInventoryComponent::TryAddItem_Internal(URbsInventoryItem* It
 				}
 
 				ExistingItem->SetQuantity(ExistingItem->GetQuantity() + ActualAddAmount);
+				OnInventoryUpdated.Broadcast();
 
 				ensure(Item->GetQuantity() <= Item->MaxStackSize);
 
@@ -153,7 +156,8 @@ bool URbsInventoryComponent::RemoveItem(URbsInventoryItem* Item)
 		return false;
 			
 	Items.RemoveSingle(Item);
-	
+
+	Item->OnItemModified.RemoveDynamic(this, &ThisClass::OnItemModified_Internal);
 	//OnItemRemoved.Broadcast(Item);
 
 	ReplicatedItemsKey++;
@@ -194,6 +198,11 @@ int32 URbsInventoryComponent::ConsumeItem(URbsInventoryItem* Item, const int32 Q
 	}
 
 	return RemoveQuantity;
+}
+
+void URbsInventoryComponent::OnItemModified_Internal()
+{
+	OnInventoryUpdated.Broadcast();
 }
 
 /*

@@ -51,7 +51,7 @@ void URbsInventoryItem::MarkDirtyForReplication()
 
 	if (IsValid(OwningInventory))
 	{
-		++OwningInventory->ReplicatedItemsKey;
+		OwningInventory->ReplicatedItemsKey++;
 	}
 }
 
@@ -73,6 +73,7 @@ void URbsInventoryItem::SetQuantity(const int32& NewQuantity)
 	if (NewQuantity != Quantity)
 	{
 		Quantity = FMath::Clamp(NewQuantity, 0, bStackable ? MaxStackSize : 1);
+		OnRep_Quantity();
 		MarkDirtyForReplication();
 	}
 }
