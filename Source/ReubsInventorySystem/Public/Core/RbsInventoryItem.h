@@ -32,6 +32,7 @@ public:
 /*
  * Properties
  */
+	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	TSubclassOf<AActor> PickupClass;
 
@@ -101,7 +102,7 @@ public:
 	void AddedToInventory(URbsInventoryComponent* Inventory);
 
 	UFUNCTION(BlueprintCallable, Category = "Item")
-	void SetQuantity(const int32 &NewQuantity);
+	void SetQuantity(const int32 NewQuantity);
 	
 /*	
  * Helpers

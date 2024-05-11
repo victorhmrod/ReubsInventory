@@ -11,7 +11,6 @@ URbsInventoryItem::URbsInventoryItem()
 {
 	DisplayName = LOCTEXT("Placeholder Name", "Item");
 	Description = LOCTEXT("Placeholder Description", "Item");
-	UseActionText = LOCTEXT("Placeholder Action", "Item");
 }
 
 #if WITH_EDITOR
@@ -68,11 +67,12 @@ void URbsInventoryItem::AddedToInventory_Implementation(URbsInventoryComponent* 
 {
 }
 
-void URbsInventoryItem::SetQuantity(const int32& NewQuantity)
+void URbsInventoryItem::SetQuantity(const int32 NewQuantity)
 {
 	if (NewQuantity != Quantity)
 	{
-		Quantity = FMath::Clamp(NewQuantity, 0, bStackable ? MaxStackSize : 1);
+		Quantity = NewQuantity;
+			//FMath::Clamp(NewQuantity, 0, bStackable ? MaxStackSize : 1);
 		OnRep_Quantity();
 		MarkDirtyForReplication();
 	}

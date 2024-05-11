@@ -3,8 +3,10 @@
 
 #include "Core/RbsInventoryComponent.h"
 
+#include "Components/CapsuleComponent.h"
 #include "Core/RbsInventoryItem.h"
 #include "Engine/ActorChannel.h"
+#include "GameFramework/Character.h"
 #include "Net/UnrealNetwork.h"
 
 #define LOCTEXT_NAMESPACE "Inventory"
@@ -94,8 +96,52 @@ FItemAddResult URbsInventoryComponent::TryAddItem_Internal(URbsInventoryItem* It
 
 	if (Item->bStackable)
 	{
-		ensure(Item->GetQuantity() <= Item->MaxStackSize);
+		//ensure(Item->GetQuantity() <= Item->MaxStackSize);
 
+		const int32 WeightMaxAddAmount = FMath::FloorToInt((WeightCapacity - GetCurrentWeight()) / Item->Weight);
+		int32 ActualAddAmount = FMath::Min(AddAmount, WeightMaxAddAmount);
+		if (ActualAddAmount <= 0)
+			return FItemAddResult::AddedNone(AddAmount, LOCTEXT("InventoryErrorText", "Couldn't add any item"));
+		
+		auto ExistingItems = FindItems(Item);
+		for (auto Temp : ExistingItems)
+		{
+			if (Temp->GetQuantity() >= Temp->MaxStackSize)
+				continue;
+			
+			const int32 StackAddAmount = FMath::Min(ActualAddAmount, Temp->MaxStackSize - Temp->GetQuantity());
+			if (StackAddAmount <= 0)
+				continue;
+			
+			Temp->SetQuantity(Temp->GetQuantity() + StackAddAmount);
+			Item->SetQuantity(Item->GetQuantity() - StackAddAmount);
+			ActualAddAmount -= StackAddAmount;
+		}
+
+		if (ActualAddAmount > 0)
+		{
+			const int32 StacksToAdd = FMath::CeilToInt(float(ActualAddAmount) / float(Item->MaxStackSize));
+			for (size_t i = 0; i < StacksToAdd; i++)
+			{
+				if (ActualAddAmount <= 0)
+					break;
+				
+				int32 StackAddAmount = FMath::Min(ActualAddAmount, Item->MaxStackSize);
+				if (StackAddAmount <= 0)
+					continue;
+				
+				ActualAddAmount -= StackAddAmount;
+				Item->SetQuantity(StackAddAmount);
+				AddItem(Item);
+			}
+		}
+
+		if (ActualAddAmount > 0)
+			return FItemAddResult::AddedSome(Item, AddAmount, ActualAddAmount, LOCTEXT("InventoryAddedSomeText", "Couldn't add all items"));
+		
+		return FItemAddResult::AddedAll(Item, AddAmount);
+
+		/*
 		if (URbsInventoryItem* ExistingItem = FindItem(Item))
 		{
 			if (ExistingItem->GetQuantity() < ExistingItem->MaxStackSize)
@@ -137,6 +183,7 @@ FItemAddResult URbsInventoryComponent::TryAddItem_Internal(URbsInventoryItem* It
 			AddItem(Item);
 			return FItemAddResult::AddedAll(Item, Item->GetQuantity());	
 		}
+		*/
 	}
 	else
 	{
@@ -155,13 +202,11 @@ bool URbsInventoryComponent::RemoveItem(URbsInventoryItem* Item)
 	if (!IsValid(Item))
 		return false;
 			
-	Items.RemoveSingle(Item);
-
-	Item->OnItemModified.RemoveDynamic(this, &ThisClass::OnItemModified_Internal);
-	//OnItemRemoved.Broadcast(Item);
+	Items.Remove(Item);
+	OnReplicated_Items();
 
 	ReplicatedItemsKey++;
-
+	
 	return true;
 }
 
@@ -192,12 +237,66 @@ int32 URbsInventoryComponent::ConsumeItem(URbsInventoryItem* Item, const int32 Q
 	{
 		RemoveItem(Item);
 	}
-	else
-	{
-		ClientRefreshInventory();
-	}
+
+	ClientRefreshInventory();
 
 	return RemoveQuantity;
+}
+
+void URbsInventoryComponent::UseItem(URbsInventoryItem* Item)
+{
+	if (GetOwnerRole() < ROLE_Authority)
+		ServerUseItem(Item);
+
+	if (GetOwner()->GetLocalRole() >= ROLE_Authority)
+	{
+		if (!IsValid(FindItem(Item)))
+			return;
+	}
+
+	if (IsValid(Item))
+	{
+		Item->Use(this);
+	}
+}
+
+void URbsInventoryComponent::ServerUseItem_Implementation(URbsInventoryItem* Item)
+{
+	UseItem(Item);
+}
+
+void URbsInventoryComponent::DropItem(URbsInventoryItem* Item, const int32 Quantity)
+{
+	if (!IsValid(FindItem(Item)))
+		return;
+
+	if (GetOwnerRole() < ROLE_Authority)
+	{
+		ServerDropItem(Item, Quantity);
+		return;
+	}
+	
+	const int32 DroppedQuantity = ConsumeItem(Item, Quantity);
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = GetOwner();
+	SpawnParams.bNoFail = true;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+	FVector SpawnLocation = GetOwner()->GetActorLocation();
+	SpawnLocation.Z -= Cast<ACharacter>(GetOwner())->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	
+	FTransform SpawnTransform(GetOwner()->GetActorRotation(), SpawnLocation);
+
+	ensure(Item->PickupClass);
+
+	AActor* Pickup = GetWorld()->SpawnActor<AActor>(Item->PickupClass, SpawnTransform, SpawnParams);
+	// TODO - Call interrface function to set the quantity
+}
+
+void URbsInventoryComponent::ServerDropItem_Implementation(URbsInventoryItem* Item, const int32 Quantity)
+{
+	DropItem(Item, Quantity);
 }
 
 void URbsInventoryComponent::OnItemModified_Internal()

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "RbsInventoryItem.h"
+#include "Utils/RbsTypes.h"
 #include "RbsInventoryComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryUpdated);
@@ -44,6 +45,7 @@ protected:
 	
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
 	FOnInventoryUpdated OnInventoryUpdated;
+	
 
 /*
  * Replication
@@ -90,6 +92,18 @@ public:
 	
 	int32 ConsumeItem(URbsInventoryItem* Item);
 	int32 ConsumeItem(URbsInventoryItem* Item, const int32 Quantity);
+
+	UFUNCTION(BlueprintCallable, Category = "Items")
+	void UseItem(URbsInventoryItem* Item);
+
+	UFUNCTION(Server, Reliable)
+	void ServerUseItem(URbsInventoryItem* Item);
+
+	UFUNCTION(BlueprintCallable, Category = "Items")
+	void DropItem(URbsInventoryItem* Item, const int32 Quantity);
+
+	UFUNCTION(Server, Reliable)
+	void ServerDropItem(URbsInventoryItem* Item, const int32 Quantity);
 
 protected:
 
