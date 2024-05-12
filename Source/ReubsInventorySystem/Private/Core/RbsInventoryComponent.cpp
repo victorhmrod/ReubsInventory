@@ -8,6 +8,7 @@
 #include "Engine/ActorChannel.h"
 #include "GameFramework/Character.h"
 #include "Net/UnrealNetwork.h"
+#include "Utils/RbsPickupInterface.h"
 
 #define LOCTEXT_NAMESPACE "Inventory"
 
@@ -93,105 +94,52 @@ FItemAddResult URbsInventoryComponent::TryAddItem_Internal(URbsInventoryItem* It
 
 	if (GetCurrentWeight() + Item->Weight > GetWeightCapacity())
 		return FItemAddResult::AddedNone(AddAmount, LOCTEXT("InventoryTooMuchWeightText", "Too Much Weight"));
-
+	
+	const int32 WeightMaxAddAmount = FMath::FloorToInt((WeightCapacity - GetCurrentWeight()) / Item->Weight);
+	int32 ActualAddAmount = FMath::Min(AddAmount, WeightMaxAddAmount);
+	if (ActualAddAmount <= 0)
+		return FItemAddResult::AddedNone(AddAmount, LOCTEXT("InventoryErrorText", "Couldn't add any item"));
+	
 	if (Item->bStackable)
 	{
-		//ensure(Item->GetQuantity() <= Item->MaxStackSize);
-
-		const int32 WeightMaxAddAmount = FMath::FloorToInt((WeightCapacity - GetCurrentWeight()) / Item->Weight);
-		int32 ActualAddAmount = FMath::Min(AddAmount, WeightMaxAddAmount);
-		if (ActualAddAmount <= 0)
-			return FItemAddResult::AddedNone(AddAmount, LOCTEXT("InventoryErrorText", "Couldn't add any item"));
-		
 		auto ExistingItems = FindItems(Item);
 		for (auto Temp : ExistingItems)
 		{
 			if (Temp->GetQuantity() >= Temp->MaxStackSize)
 				continue;
-			
+    			
 			const int32 StackAddAmount = FMath::Min(ActualAddAmount, Temp->MaxStackSize - Temp->GetQuantity());
 			if (StackAddAmount <= 0)
 				continue;
-			
+    			
 			Temp->SetQuantity(Temp->GetQuantity() + StackAddAmount);
 			Item->SetQuantity(Item->GetQuantity() - StackAddAmount);
 			ActualAddAmount -= StackAddAmount;
 		}
-
-		if (ActualAddAmount > 0)
-		{
-			const int32 StacksToAdd = FMath::CeilToInt(float(ActualAddAmount) / float(Item->MaxStackSize));
-			for (size_t i = 0; i < StacksToAdd; i++)
-			{
-				if (ActualAddAmount <= 0)
-					break;
-				
-				int32 StackAddAmount = FMath::Min(ActualAddAmount, Item->MaxStackSize);
-				if (StackAddAmount <= 0)
-					continue;
-				
-				ActualAddAmount -= StackAddAmount;
-				Item->SetQuantity(StackAddAmount);
-				AddItem(Item);
-			}
-		}
-
-		if (ActualAddAmount > 0)
-			return FItemAddResult::AddedSome(Item, AddAmount, ActualAddAmount, LOCTEXT("InventoryAddedSomeText", "Couldn't add all items"));
-		
-		return FItemAddResult::AddedAll(Item, AddAmount);
-
-		/*
-		if (URbsInventoryItem* ExistingItem = FindItem(Item))
-		{
-			if (ExistingItem->GetQuantity() < ExistingItem->MaxStackSize)
-			{
-				const int32 CapacityMaxAddAmount = ExistingItem->MaxStackSize - ExistingItem->GetQuantity();
-				int ActualAddAmount = FMath::Min(AddAmount, CapacityMaxAddAmount);
-
-				FText ErrorText = LOCTEXT("InventoryAddedSomeText", "Couldn't add all items");
-				
-				const int32 WeightMaxAddAmount = FMath::FloorToInt((WeightCapacity - GetCurrentWeight()) / Item->Weight);
-				ActualAddAmount = FMath::Min(ActualAddAmount, WeightMaxAddAmount);
-
-				if (ActualAddAmount <= 0)
-				{
-					return FItemAddResult::AddedNone(AddAmount, LOCTEXT("InventoryErrorText", "Couldn't add any item"));
-				}
-
-				ExistingItem->SetQuantity(ExistingItem->GetQuantity() + ActualAddAmount);
-				OnInventoryUpdated.Broadcast();
-
-				ensure(Item->GetQuantity() <= Item->MaxStackSize);
-
-				if (ActualAddAmount < AddAmount)
-				{
-					return FItemAddResult::AddedSome(Item, AddAmount, ActualAddAmount, ErrorText);
-				}
-				else
-				{
-					return FItemAddResult::AddedAll(Item, AddAmount);
-				}
-			}
-			else
-			{
-				return FItemAddResult::AddedNone(AddAmount, LOCTEXT("InventoryFullStackText", "You Already Have a Full Stack of this Item"));
-			}
-		}
-		else
-		{
-			AddItem(Item);
-			return FItemAddResult::AddedAll(Item, Item->GetQuantity());	
-		}
-		*/
 	}
-	else
+    
+	if (ActualAddAmount > 0)
 	{
-		ensure(Item->GetQuantity() == 1);
-
-		AddItem(Item);
-		return FItemAddResult::AddedAll(Item, Item->GetQuantity());
+		const int32 StacksToAdd = FMath::CeilToInt(float(ActualAddAmount) / float(Item->MaxStackSize));
+		for (size_t i = 0; i < StacksToAdd; i++)
+		{
+			if (ActualAddAmount <= 0)
+				break;
+    				
+			const int32 StackAddAmount = FMath::Min(ActualAddAmount, Item->MaxStackSize);
+			if (StackAddAmount <= 0)
+				continue;
+    				
+			ActualAddAmount -= StackAddAmount;
+			Item->SetQuantity(StackAddAmount);
+			AddItem(Item);
+		}
 	}
+
+	if (ActualAddAmount > 0)
+		return FItemAddResult::AddedSome(Item, AddAmount, ActualAddAmount, LOCTEXT("InventoryAddedSomeText", "Couldn't add all items"));
+    		
+	return FItemAddResult::AddedAll(Item, AddAmount);
 }
 
 bool URbsInventoryComponent::RemoveItem(URbsInventoryItem* Item)
@@ -201,11 +149,13 @@ bool URbsInventoryComponent::RemoveItem(URbsInventoryItem* Item)
 
 	if (!IsValid(Item))
 		return false;
-			
+
+	Item->OwningInventory = nullptr;
 	Items.Remove(Item);
-	OnReplicated_Items();
 
 	ReplicatedItemsKey++;
+
+	OnReplicated_Items();
 	
 	return true;
 }
@@ -216,6 +166,7 @@ int32 URbsInventoryComponent::ConsumeItem(URbsInventoryItem* Item)
 	{
 		return ConsumeItem(Item, Item->Quantity);
 	}
+	
 	return 0;
 }
 
@@ -238,6 +189,7 @@ int32 URbsInventoryComponent::ConsumeItem(URbsInventoryItem* Item, const int32 Q
 		RemoveItem(Item);
 	}
 
+	OnInventoryUpdated.Broadcast();
 	ClientRefreshInventory();
 
 	return RemoveQuantity;
@@ -291,7 +243,7 @@ void URbsInventoryComponent::DropItem(URbsInventoryItem* Item, const int32 Quant
 	ensure(Item->PickupClass);
 
 	AActor* Pickup = GetWorld()->SpawnActor<AActor>(Item->PickupClass, SpawnTransform, SpawnParams);
-	// TODO - Call interrface function to set the quantity
+	IRbsPickupInterface::Execute_SetPickupQuantity(Pickup, DroppedQuantity);
 }
 
 void URbsInventoryComponent::ServerDropItem_Implementation(URbsInventoryItem* Item, const int32 Quantity)

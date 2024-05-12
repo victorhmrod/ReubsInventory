@@ -31,6 +31,7 @@ void URbsInventoryItem::PostEditChangeProperty(FPropertyChangedEvent& PropertyCh
 		if (!bStackable)
 		{
 			Quantity = 1;
+			MaxStackSize = 1;
 		}
 	}
 }
