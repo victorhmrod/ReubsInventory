@@ -119,4 +119,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Item")
 	FORCEINLINE bool IsStackFull() const { return Quantity >= MaxStackSize; }
+
+	UFUNCTION(BlueprintPure, BlueprintCallable, Category = "Item")
+	FORCEINLINE URbsInventoryComponent* GetOwningInventory() { return OwningInventory; }
 };

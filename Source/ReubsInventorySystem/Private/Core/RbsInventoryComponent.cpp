@@ -144,18 +144,19 @@ FItemAddResult URbsInventoryComponent::TryAddItem_Internal(URbsInventoryItem* It
 
 bool URbsInventoryComponent::RemoveItem(URbsInventoryItem* Item)
 {
-	if (GetOwner()->GetLocalRole() < ROLE_Authority)
+	if (GetOwnerRole() < ROLE_Authority)
 		return false;
 
 	if (!IsValid(Item))
 		return false;
 
 	Item->OwningInventory = nullptr;
-	Items.Remove(Item);
-
-	ReplicatedItemsKey++;
-
+	Items.RemoveSingle(Item);
+	Item->MarkDirtyForReplication();
+	
 	OnReplicated_Items();
+	
+	ReplicatedItemsKey++;
 	
 	return true;
 }
@@ -188,9 +189,10 @@ int32 URbsInventoryComponent::ConsumeItem(URbsInventoryItem* Item, const int32 Q
 	{
 		RemoveItem(Item);
 	}
-
-	OnInventoryUpdated.Broadcast();
-	ClientRefreshInventory();
+	else
+	{
+		ClientRefreshInventory();
+	}
 
 	return RemoveQuantity;
 }
