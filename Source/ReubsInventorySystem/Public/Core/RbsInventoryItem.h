@@ -42,8 +42,17 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Item")
 	FText DisplayName;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Item")
+	FText Category;
+	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Item", meta = (MultiLine = true))
 	FText Description;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item", meta=(InlineEditConditionToggle = true))
+	bool bShowUseText = true;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item", meta=(EditCondition="bShowUseText"))
+	FText UseText;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Item", meta = (ClampMin = 0.0))
 	float Weight = 1.f;
