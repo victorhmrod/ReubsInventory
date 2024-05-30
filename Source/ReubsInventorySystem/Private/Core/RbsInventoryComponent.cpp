@@ -246,6 +246,7 @@ void URbsInventoryComponent::DropItem(URbsInventoryItem* Item, const int32 Quant
 
 	AActor* Pickup = GetWorld()->SpawnActor<AActor>(Item->PickupClass, SpawnTransform, SpawnParams);
 	IRbsPickupInterface::Execute_SetPickupQuantity(Pickup, DroppedQuantity);
+	IRbsPickupInterface::Execute_OnDropItem(Pickup);
 }
 
 void URbsInventoryComponent::ServerDropItem_Implementation(URbsInventoryItem* Item, const int32 Quantity)

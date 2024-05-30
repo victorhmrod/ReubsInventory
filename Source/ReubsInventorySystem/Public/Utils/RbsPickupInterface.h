@@ -21,4 +21,7 @@ public:
 
 	UFUNCTION(BlueprintNativeEvent)
 	void SetPickupQuantity(const int32 NewQuantity);
+
+	UFUNCTION(BlueprintNativeEvent)
+	void OnDropItem();
 };
